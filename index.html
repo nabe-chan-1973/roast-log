@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#3b2417">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="焙煎ログ">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>焙煎ログ</title>
+<style>
+  :root{
+    --bg:#2b1d14; --bg2:#3b2417; --card:#4a3527; --card2:#5a4234;
+    --accent:#d98a3d; --accent2:#e0a35c; --text:#f5ece2; --sub:#c9b6a3;
+    --line:#6b4f3c; --good:#7cb87c; --danger:#d96a5a;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent;}
+  body{
+    margin:0; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",
+      "Hiragino Sans","Yu Gothic UI",sans-serif;
+    background:linear-gradient(180deg,var(--bg),var(--bg2)); color:var(--text);
+    padding:env(safe-area-inset-top) 0 calc(env(safe-area-inset-bottom) + 12px);
+    min-height:100vh;
+  }
+  header{text-align:center; padding:14px 16px 6px;}
+  header h1{margin:0; font-size:20px; letter-spacing:.05em;}
+  header .sub{color:var(--sub); font-size:12px; margin-top:2px;}
+  main{max-width:560px; margin:0 auto; padding:0 14px;}
+  .card{background:var(--card); border:1px solid var(--line);
+    border-radius:16px; padding:16px; margin:12px 0; box-shadow:0 2px 8px rgba(0,0,0,.25);}
+  .tabs{display:flex; gap:8px; margin:8px 0 0;}
+  .tab{flex:1; text-align:center; padding:10px; border-radius:12px;
+    background:var(--card); border:1px solid var(--line); color:var(--sub);
+    font-size:15px; font-weight:600; cursor:pointer;}
+  .tab.active{background:var(--accent); color:#2b1d14; border-color:var(--accent);}
+
+  /* Timer */
+  .timer{font-variant-numeric:tabular-nums; font-size:64px; font-weight:700;
+    text-align:center; letter-spacing:.02em; margin:4px 0 2px;}
+  .timer.running{color:var(--accent2);}
+  .timer-ctrl{display:flex; gap:10px; justify-content:center; margin-top:8px;}
+  .timer-ctrl button{flex:1; max-width:160px;}
+
+  button{font-family:inherit; border:none; border-radius:12px; padding:14px;
+    font-size:16px; font-weight:600; cursor:pointer; color:#2b1d14;
+    background:var(--accent); transition:transform .05s, filter .15s;}
+  button:active{transform:scale(.97);}
+  button.ghost{background:transparent; color:var(--text); border:1px solid var(--line);}
+  button.sec{background:var(--card2); color:var(--text);}
+  button.danger{background:var(--danger); color:#fff;}
+
+  .marks{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:6px;}
+  .mark-btn{display:flex; flex-direction:column; align-items:center; gap:4px;
+    padding:14px 8px; background:var(--card2); color:var(--text);
+    border:1px solid var(--line); border-radius:14px;}
+  .mark-btn .label{font-size:15px;}
+  .mark-btn .val{font-size:22px; font-variant-numeric:tabular-nums; font-weight:700;
+    color:var(--accent2);}
+  .mark-btn.done{border-color:var(--accent); background:#56402f;}
+  .mark-btn .val.empty{color:var(--sub); font-weight:400; font-size:16px;}
+  .mark-btn .clear{font-size:11px; color:var(--sub); text-decoration:underline;}
+
+  label{display:block; font-size:13px; color:var(--sub); margin:12px 0 4px;}
+  input,textarea{width:100%; padding:12px; border-radius:10px;
+    border:1px solid var(--line); background:#3a2a1e; color:var(--text);
+    font-size:16px; font-family:inherit;}
+  textarea{resize:vertical; min-height:54px;}
+  .row{display:flex; gap:10px;}
+  .row > div{flex:1;}
+  .calc{background:#56402f; border:1px solid var(--accent); border-radius:12px;
+    padding:12px 14px; margin-top:12px; display:flex; justify-content:space-between;
+    align-items:center;}
+  .calc .k{font-size:13px; color:var(--sub);}
+  .calc .v{font-size:26px; font-weight:700; color:var(--accent2);
+    font-variant-numeric:tabular-nums;}
+
+  .actions{display:flex; gap:10px; margin-top:14px;}
+  .actions button{flex:1;}
+
+  /* Records table */
+  .table-wrap{overflow-x:auto; -webkit-overflow-scrolling:touch; margin-top:4px;}
+  table{border-collapse:collapse; width:100%; font-size:12px; table-layout:fixed;}
+  th,td{padding:5px 4px; border-bottom:1px solid var(--line); text-align:left;
+    overflow:hidden;}
+  th{color:var(--sub); font-weight:600; position:sticky; top:0; background:var(--card);
+    font-size:11px; line-height:1.2;}
+  td.num,th.num{text-align:right; font-variant-numeric:tabular-nums;}
+  td.date,th.date{white-space:nowrap; font-size:11px; line-height:1.25; color:var(--sub);}
+  td.bean{white-space:normal; word-break:break-word; line-height:1.2;}
+  tr:active{background:#56402f;}
+  .empty-note{color:var(--sub); text-align:center; padding:24px 0;}
+  .rec-tools{display:flex; gap:10px; margin-top:12px;}
+  .rec-tools button{flex:1; font-size:14px; padding:11px;}
+  .select-bar{display:flex; gap:10px; margin-top:12px;}
+  .select-bar button{flex:1; font-size:14px; padding:11px;}
+
+  /* Records view: break out to full window width to show all columns */
+  #view-records{width:100vw; position:relative; left:50%; margin-left:-50vw;
+    padding:0 8px;}
+  #view-records .card{padding:10px;}
+
+  /* selection column: hidden until select mode */
+  th.sel,td.sel{display:none; width:36px; text-align:center;}
+  #recTable.select-mode th.sel,
+  #recTable.select-mode td.sel{display:table-cell;}
+  td.sel input{width:20px; height:20px; accent-color:var(--accent);}
+  #recTable.select-mode tr.row-checked{background:#56402f;}
+
+  .toast{position:fixed; left:50%; bottom:26px; transform:translateX(-50%);
+    background:#1d130c; color:var(--text); padding:12px 18px; border-radius:24px;
+    border:1px solid var(--accent); font-size:14px; opacity:0; pointer-events:none;
+    transition:opacity .25s, transform .25s; z-index:50;}
+  .toast.show{opacity:1; transform:translateX(-50%) translateY(-6px);}
+
+  .modal{position:fixed; inset:0; background:rgba(0,0,0,.6); display:none;
+    align-items:center; justify-content:center; padding:20px; z-index:60;}
+  .modal.show{display:flex;}
+  .modal .box{background:var(--card); border:1px solid var(--line); border-radius:16px;
+    padding:20px; max-width:420px; width:100%; max-height:80vh; overflow:auto;}
+  .modal h3{margin:0 0 10px;}
+  .detail-row{display:flex; justify-content:space-between; gap:12px;
+    padding:8px 0; border-bottom:1px solid var(--line); font-size:14px;}
+  .detail-row .k{color:var(--sub);}
+  .hidden{display:none !important;}
+</style>
+</head>
+<body>
+<header>
+  <h1>☕ 焙煎ログ</h1>
+  <div class="sub">片手鍋焙煎タイマー＆記録</div>
+</header>
+
+<main>
+  <div class="tabs">
+    <div class="tab active" data-tab="roast" id="tabRoast">焙煎する</div>
+    <div class="tab" data-tab="records" id="tabRecords">記録一覧</div>
+  </div>
+
+  <!-- ===== ROAST TAB ===== -->
+  <section id="view-roast">
+    <div class="card">
+      <div class="timer" id="timer">00:00</div>
+      <div class="timer-ctrl">
+        <button id="btnStart">スタート</button>
+        <button id="btnReset" class="ghost">リセット</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="marks" id="marks">
+        <button class="mark-btn" data-key="firstCrack">
+          <span class="label">1ハゼ</span>
+          <span class="val empty" data-val>--:--</span>
+        </button>
+        <button class="mark-btn" data-key="secondCrack">
+          <span class="label">2ハゼ</span>
+          <span class="val empty" data-val>--:--</span>
+        </button>
+        <button class="mark-btn" data-key="fireOff">
+          <span class="label">消火</span>
+          <span class="val empty" data-val>--:--</span>
+        </button>
+        <button class="mark-btn" data-key="beansOut">
+          <span class="label">ザル出し</span>
+          <span class="val empty" data-val>--:--</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="card">
+      <label for="beanInfo">豆の情報（種類・銘柄など）</label>
+      <textarea id="beanInfo" placeholder="例: エチオピア イルガチェフェ G1"></textarea>
+
+      <div class="row">
+        <div>
+          <label for="greenWeight">生豆の重さ (g)</label>
+          <input id="greenWeight" type="number" inputmode="decimal" placeholder="例: 200">
+        </div>
+        <div>
+          <label for="roastedWeight">焙煎後の重さ (g)</label>
+          <input id="roastedWeight" type="number" inputmode="decimal" placeholder="例: 168">
+        </div>
+      </div>
+
+      <div class="calc">
+        <span class="k">焙煎指数（生豆 ÷ 焙煎後）</span>
+        <span class="v" id="roastIndex">--</span>
+      </div>
+
+      <label for="memo">メモ（任意）</label>
+      <textarea id="memo" placeholder="火力、香り、味の感想など"></textarea>
+
+      <div class="actions">
+        <button id="btnSave">この焙煎を保存</button>
+        <button id="btnClear" class="sec">入力クリア</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== RECORDS TAB ===== -->
+  <section id="view-records" class="hidden">
+    <div class="card">
+      <div class="table-wrap">
+        <table id="recTable">
+          <thead>
+            <tr>
+              <th class="sel"></th>
+              <th class="date" style="width:15%">日時</th>
+              <th style="width:21%">豆</th>
+              <th class="num" style="width:8%">生g</th>
+              <th class="num" style="width:8%">後g</th>
+              <th class="num" style="width:9%">指数</th>
+              <th class="num" style="width:9.75%">1ハゼ</th>
+              <th class="num" style="width:9.75%">2ハゼ</th>
+              <th class="num" style="width:9.75%">消火</th>
+              <th class="num" style="width:9.75%">ザル</th>
+            </tr>
+          </thead>
+          <tbody id="recBody"></tbody>
+        </table>
+      </div>
+      <div class="empty-note hidden" id="emptyNote">まだ記録がありません。<br>「焙煎する」タブで保存すると、ここに表示されます。</div>
+
+      <div class="select-bar hidden" id="selectBar">
+        <button class="ghost" id="btnSelectAll">全選択</button>
+        <button class="danger" id="btnDeleteSel">選択を削除 (0)</button>
+        <button class="sec" id="btnSelectCancel">キャンセル</button>
+      </div>
+
+      <div class="rec-tools" id="recTools">
+        <button id="btnSelect" class="sec">選択して削除</button>
+        <button id="btnCsv" class="sec">CSV書き出し</button>
+        <button id="btnBackup" class="sec">バックアップ(JSON)</button>
+        <button id="btnImport" class="sec">読み込み(JSON)</button>
+      </div>
+      <input type="file" id="importFile" accept=".json,application/json" class="hidden">
+    </div>
+  </section>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<!-- detail modal -->
+<div class="modal" id="modal">
+  <div class="box">
+    <h3 id="mTitle">焙煎記録</h3>
+    <div id="mBody"></div>
+    <div class="actions">
+      <button class="danger" id="mDelete">この記録を削除</button>
+      <button class="ghost" id="mClose">閉じる</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STORE_KEY = "roastLogs.v1";
+const MARK_KEYS = [
+  {key:"firstCrack", label:"1ハゼ"},
+  {key:"secondCrack", label:"2ハゼ"},
+  {key:"fireOff", label:"消火"},
+  {key:"beansOut", label:"ザル出し"},
+];
+
+/* ---------- Timer ---------- */
+let startEpoch = null;     // ms when started/resumed
+let accumulated = 0;       // ms accumulated before current run
+let running = false;
+let rafId = null;
+let marks = {};            // key -> seconds (number)
+
+const timerEl = document.getElementById("timer");
+const btnStart = document.getElementById("btnStart");
+
+function elapsedMs(){
+  return accumulated + (running ? (Date.now() - startEpoch) : 0);
+}
+function fmt(sec){
+  sec = Math.max(0, Math.floor(sec));
+  const m = Math.floor(sec/60), s = sec%60;
+  return String(m).padStart(2,"0")+":"+String(s).padStart(2,"0");
+}
+function renderTimer(){
+  timerEl.textContent = fmt(elapsedMs()/1000);
+}
+function tick(){
+  renderTimer();
+  if(running) rafId = requestAnimationFrame(tick);
+}
+function startTimer(){
+  if(running) return;
+  running = true;
+  startEpoch = Date.now();
+  timerEl.classList.add("running");
+  btnStart.textContent = "一時停止";
+  tick();
+}
+function pauseTimer(){
+  if(!running) return;
+  accumulated = elapsedMs();
+  running = false;
+  cancelAnimationFrame(rafId);
+  timerEl.classList.remove("running");
+  btnStart.textContent = "再開";
+  renderTimer();
+}
+function resetTimer(){
+  running = false;
+  cancelAnimationFrame(rafId);
+  accumulated = 0; startEpoch = null;
+  marks = {};
+  timerEl.classList.remove("running");
+  btnStart.textContent = "スタート";
+  renderTimer();
+  renderMarks();
+}
+btnStart.addEventListener("click", ()=> running ? pauseTimer() : startTimer());
+document.getElementById("btnReset").addEventListener("click", ()=>{
+  if(elapsedMs()>0 || Object.keys(marks).length){
+    if(!confirm("タイマーと記録ボタンをリセットします。よろしいですか？")) return;
+  }
+  resetTimer();
+});
+
+/* ---------- Mark buttons ---------- */
+function renderMarks(){
+  document.querySelectorAll(".mark-btn").forEach(btn=>{
+    const key = btn.dataset.key;
+    const valEl = btn.querySelector("[data-val]");
+    if(marks[key] != null){
+      valEl.textContent = fmt(marks[key]);
+      valEl.classList.remove("empty");
+      btn.classList.add("done");
+    }else{
+      valEl.textContent = "--:--";
+      valEl.classList.add("empty");
+      btn.classList.remove("done");
+    }
+  });
+}
+document.querySelectorAll(".mark-btn").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    const key = btn.dataset.key;
+    if(marks[key] != null){
+      // tap again to overwrite with current time; long-confirm to clear
+      if(confirm("「"+btn.querySelector(".label").textContent+"」を今の時間で上書きしますか？\n（キャンセルで記録を消去）")){
+        marks[key] = Math.floor(elapsedMs()/1000);
+      }else{
+        delete marks[key];
+      }
+    }else{
+      if(!running && elapsedMs()===0){
+        toast("先にタイマーをスタートしてください");
+        return;
+      }
+      marks[key] = Math.floor(elapsedMs()/1000);
+    }
+    renderMarks();
+  });
+});
+
+/* ---------- Roast index ---------- */
+const greenEl = document.getElementById("greenWeight");
+const roastedEl = document.getElementById("roastedWeight");
+const idxEl = document.getElementById("roastIndex");
+function calcIndex(){
+  const g = parseFloat(greenEl.value), r = parseFloat(roastedEl.value);
+  if(g>0 && r>0){
+    idxEl.textContent = (g/r).toFixed(2);
+    return +(g/r).toFixed(3);
+  }
+  idxEl.textContent = "--";
+  return null;
+}
+greenEl.addEventListener("input", calcIndex);
+roastedEl.addEventListener("input", calcIndex);
+
+/* ---------- Save / storage ---------- */
+function loadLogs(){
+  try{ return JSON.parse(localStorage.getItem(STORE_KEY)) || []; }
+  catch(e){ return []; }
+}
+function saveLogs(logs){
+  localStorage.setItem(STORE_KEY, JSON.stringify(logs));
+}
+function nowStamp(){
+  const d = new Date();
+  const p = n => String(n).padStart(2,"0");
+  return d.getFullYear()+"-"+p(d.getMonth()+1)+"-"+p(d.getDate())+
+         " "+p(d.getHours())+":"+p(d.getMinutes());
+}
+
+document.getElementById("btnSave").addEventListener("click", ()=>{
+  const g = parseFloat(greenEl.value)||null;
+  const r = parseFloat(roastedEl.value)||null;
+  const beanInfo = document.getElementById("beanInfo").value.trim();
+  const totalSec = Math.floor(elapsedMs()/1000);
+
+  if(!beanInfo && !g && Object.keys(marks).length===0 && totalSec===0){
+    toast("記録する内容がありません");
+    return;
+  }
+  const rec = {
+    id: Date.now(),
+    stamp: nowStamp(),
+    beanInfo,
+    green: g, roasted: r,
+    index: calcIndex(),
+    totalSec,
+    marks: {...marks},
+    memo: document.getElementById("memo").value.trim()
+  };
+  const logs = loadLogs();
+  logs.unshift(rec);
+  saveLogs(logs);
+  toast("保存しました ✓");
+  renderRecords();
+});
+
+document.getElementById("btnClear").addEventListener("click", ()=>{
+  if(!confirm("入力内容とタイマーをすべてクリアします。よろしいですか？")) return;
+  document.getElementById("beanInfo").value = "";
+  greenEl.value = ""; roastedEl.value = "";
+  document.getElementById("memo").value = "";
+  calcIndex();
+  resetTimer();
+});
+
+/* ---------- Records table ---------- */
+function renderRecords(){
+  const logs = loadLogs();
+  const body = document.getElementById("recBody");
+  const emptyNote = document.getElementById("emptyNote");
+  const table = document.getElementById("recTable");
+  body.innerHTML = "";
+  if(logs.length===0){
+    emptyNote.classList.remove("hidden");
+    table.classList.add("hidden");
+    return;
+  }
+  emptyNote.classList.add("hidden");
+  table.classList.remove("hidden");
+  logs.forEach(rec=>{
+    const tr = document.createElement("tr");
+    const m = rec.marks||{};
+    const mk = k => m[k]!=null ? fmt(m[k]) : "—";
+    const checked = selectedIds.has(rec.id);
+    tr.innerHTML =
+      `<td class="sel"><input type="checkbox" ${checked?"checked":""}></td>`+
+      `<td class="date">${shortStamp(rec.stamp)}</td>`+
+      `<td class="bean">${escapeHtml(rec.beanInfo||"—")}</td>`+
+      `<td class="num">${rec.green??"—"}</td>`+
+      `<td class="num">${rec.roasted??"—"}</td>`+
+      `<td class="num">${rec.index!=null?rec.index.toFixed(2):"—"}</td>`+
+      `<td class="num">${mk("firstCrack")}</td>`+
+      `<td class="num">${mk("secondCrack")}</td>`+
+      `<td class="num">${mk("fireOff")}</td>`+
+      `<td class="num">${mk("beansOut")}</td>`;
+    if(checked) tr.classList.add("row-checked");
+    tr.addEventListener("click", ()=>{
+      if(selectMode) toggleSelect(rec.id);
+      else openDetail(rec.id);
+    });
+    body.appendChild(tr);
+  });
+}
+
+/* ---------- Multi-select delete ---------- */
+let selectMode = false;
+const selectedIds = new Set();
+const recTable = document.getElementById("recTable");
+const selectBar = document.getElementById("selectBar");
+const recTools = document.getElementById("recTools");
+const btnDeleteSel = document.getElementById("btnDeleteSel");
+
+function updateSelCount(){
+  btnDeleteSel.textContent = `選択を削除 (${selectedIds.size})`;
+}
+function toggleSelect(id){
+  if(selectedIds.has(id)) selectedIds.delete(id);
+  else selectedIds.add(id);
+  updateSelCount();
+  renderRecords();
+}
+function enterSelectMode(){
+  if(loadLogs().length===0){ toast("記録がありません"); return; }
+  selectMode = true;
+  selectedIds.clear();
+  recTable.classList.add("select-mode");
+  selectBar.classList.remove("hidden");
+  recTools.classList.add("hidden");
+  updateSelCount();
+  renderRecords();
+}
+function exitSelectMode(){
+  selectMode = false;
+  selectedIds.clear();
+  recTable.classList.remove("select-mode");
+  selectBar.classList.add("hidden");
+  recTools.classList.remove("hidden");
+  renderRecords();
+}
+document.getElementById("btnSelect").addEventListener("click", enterSelectMode);
+document.getElementById("btnSelectCancel").addEventListener("click", exitSelectMode);
+document.getElementById("btnSelectAll").addEventListener("click", ()=>{
+  const logs = loadLogs();
+  if(selectedIds.size === logs.length){
+    selectedIds.clear();              // toggle: all -> none
+  }else{
+    logs.forEach(r=>selectedIds.add(r.id));
+  }
+  updateSelCount();
+  renderRecords();
+});
+btnDeleteSel.addEventListener("click", ()=>{
+  if(selectedIds.size===0){ toast("削除する記録を選んでください"); return; }
+  if(!confirm(`選択した ${selectedIds.size} 件を削除します。よろしいですか？`)) return;
+  const logs = loadLogs().filter(r=>!selectedIds.has(r.id));
+  saveLogs(logs);
+  toast(`${selectedIds.size} 件を削除しました`);
+  exitSelectMode();
+});
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>(
+    {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
+}
+function shortStamp(stamp){
+  // "YYYY-MM-DD HH:MM" -> "MM/DD<br>HH:MM" (year dropped to save width)
+  const m = String(stamp||"").match(/^\d{4}-(\d{2})-(\d{2})\s+(\d{2}:\d{2})/);
+  return m ? `${m[1]}/${m[2]}<br>${m[3]}` : escapeHtml(stamp||"—");
+}
+
+/* ---------- Detail modal ---------- */
+const modal = document.getElementById("modal");
+let currentDetailId = null;
+function openDetail(id){
+  const rec = loadLogs().find(r=>r.id===id);
+  if(!rec) return;
+  currentDetailId = id;
+  const m = rec.marks||{};
+  const row = (k,v)=> `<div class="detail-row"><span class="k">${k}</span><span>${v}</span></div>`;
+  document.getElementById("mTitle").textContent = rec.stamp;
+  document.getElementById("mBody").innerHTML =
+    row("豆の情報", escapeHtml(rec.beanInfo||"—"))+
+    row("生豆の重さ", rec.green!=null? rec.green+" g":"—")+
+    row("焙煎後の重さ", rec.roasted!=null? rec.roasted+" g":"—")+
+    row("焙煎指数", rec.index!=null? rec.index.toFixed(2):"—")+
+    row("総時間", fmt(rec.totalSec||0))+
+    row("1ハゼ", m.firstCrack!=null? fmt(m.firstCrack):"—")+
+    row("2ハゼ", m.secondCrack!=null? fmt(m.secondCrack):"—")+
+    row("消火", m.fireOff!=null? fmt(m.fireOff):"—")+
+    row("ザル出し", m.beansOut!=null? fmt(m.beansOut):"—")+
+    row("メモ", escapeHtml(rec.memo||"—"));
+  modal.classList.add("show");
+}
+document.getElementById("mClose").addEventListener("click", ()=> modal.classList.remove("show"));
+modal.addEventListener("click", e=>{ if(e.target===modal) modal.classList.remove("show"); });
+document.getElementById("mDelete").addEventListener("click", ()=>{
+  if(!confirm("この記録を削除します。よろしいですか？")) return;
+  const logs = loadLogs().filter(r=>r.id!==currentDetailId);
+  saveLogs(logs);
+  modal.classList.remove("show");
+  renderRecords();
+  toast("削除しました");
+});
+
+/* ---------- CSV / Backup ---------- */
+function download(filename, text, type){
+  const blob = new Blob([text], {type:type||"text/plain;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+document.getElementById("btnCsv").addEventListener("click", ()=>{
+  const logs = loadLogs();
+  if(logs.length===0){ toast("記録がありません"); return; }
+  const head = ["日時","豆の情報","生豆(g)","焙煎後(g)","焙煎指数",
+    "総時間","1ハゼ","2ハゼ","消火","ザル出し","メモ"];
+  const esc = v => '"'+String(v??"").replace(/"/g,'""')+'"';
+  const lines = [head.join(",")];
+  logs.forEach(r=>{
+    const m = r.marks||{};
+    lines.push([
+      r.stamp, r.beanInfo, r.green, r.roasted,
+      r.index!=null?r.index.toFixed(2):"",
+      fmt(r.totalSec||0),
+      m.firstCrack!=null?fmt(m.firstCrack):"",
+      m.secondCrack!=null?fmt(m.secondCrack):"",
+      m.fireOff!=null?fmt(m.fireOff):"",
+      m.beansOut!=null?fmt(m.beansOut):"",
+      r.memo
+    ].map(esc).join(","));
+  });
+  // BOM for Excel Japanese
+  download("roast-log-"+Date.now()+".csv", "﻿"+lines.join("\r\n"),
+    "text/csv;charset=utf-8");
+});
+document.getElementById("btnBackup").addEventListener("click", ()=>{
+  const logs = loadLogs();
+  if(logs.length===0){ toast("記録がありません"); return; }
+  download("roast-log-backup-"+Date.now()+".json",
+    JSON.stringify(logs,null,2), "application/json");
+});
+
+/* ---------- Import (merge JSON) ---------- */
+const importFile = document.getElementById("importFile");
+document.getElementById("btnImport").addEventListener("click", ()=> importFile.click());
+importFile.addEventListener("change", ()=>{
+  const file = importFile.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    let incoming;
+    try{ incoming = JSON.parse(reader.result); }
+    catch(e){ toast("読み込めませんでした（JSON形式が不正）"); importFile.value=""; return; }
+    if(!Array.isArray(incoming)){ toast("バックアップ形式ではありません"); importFile.value=""; return; }
+    const logs = loadLogs();
+    const ids = new Set(logs.map(r=>r.id));
+    let added = 0;
+    incoming.forEach(r=>{
+      if(r && r.id!=null && !ids.has(r.id)){ logs.push(r); ids.add(r.id); added++; }
+    });
+    logs.sort((a,b)=> (b.id||0) - (a.id||0));   // newest first
+    saveLogs(logs);
+    renderRecords();
+    toast(added>0 ? `${added} 件を読み込みました ✓` : "新しい記録はありませんでした");
+    importFile.value="";
+  };
+  reader.readAsText(file);
+});
+
+/* ---------- Tabs ---------- */
+document.querySelectorAll(".tab").forEach(t=>{
+  t.addEventListener("click", ()=>{
+    document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));
+    t.classList.add("active");
+    const tab = t.dataset.tab;
+    document.getElementById("view-roast").classList.toggle("hidden", tab!=="roast");
+    document.getElementById("view-records").classList.toggle("hidden", tab!=="records");
+    if(tab==="records") renderRecords();
+  });
+});
+
+/* ---------- Toast ---------- */
+let toastTimer = null;
+function toast(msg){
+  const el = document.getElementById("toast");
+  el.textContent = msg; el.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=>el.classList.remove("show"), 1800);
+}
+
+/* ---------- Init ---------- */
+renderTimer(); renderMarks(); calcIndex(); renderRecords();
+
+/* Service worker (PWA) */
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{
+    navigator.serviceWorker.register("sw.js").catch(()=>{});
+  });
+}
+</script>
+</body>
+</html>
