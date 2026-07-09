@@ -69,6 +69,9 @@
   textarea{resize:vertical; min-height:54px;}
   .row{display:flex; gap:10px;}
   .row > div{flex:1;}
+  .ms{display:flex; align-items:center; gap:6px;}
+  .ms input{text-align:center; padding:12px 4px;}
+  .ms span{color:var(--sub); font-size:14px;}
   .calc{background:#56402f; border:1px solid var(--accent); border-radius:12px;
     padding:12px 14px; margin-top:12px; display:flex; justify-content:space-between;
     align-items:center;}
@@ -585,7 +588,17 @@ function openEdit(id){
   if(!rec) return;
   currentDetailId = id;
   const m = rec.marks||{};
-  const tv = sec => sec!=null ? fmt(sec) : "";
+  const ms = (key,label,sec)=>{
+    const mm = sec!=null ? Math.floor(sec/60) : "";
+    const ss = sec!=null ? (sec%60) : "";
+    return `<label>${label}</label>
+      <div class="ms">
+        <input id="e_${key}_m" type="number" inputmode="numeric" min="0" placeholder="分" value="${mm}">
+        <span>分</span>
+        <input id="e_${key}_s" type="number" inputmode="numeric" min="0" max="59" placeholder="秒" value="${ss}">
+        <span>秒</span>
+      </div>`;
+  };
   document.getElementById("mTitle").textContent = "記録を修正";
   document.getElementById("mBody").innerHTML =
     `<label for="e_stamp">日時</label>
@@ -599,19 +612,14 @@ function openEdit(id){
          <input id="e_roasted" type="number" inputmode="decimal" value="${rec.roasted??""}"></div>
      </div>
      <div class="calc"><span class="k">焙煎指数（自動）</span><span class="v" id="e_index">--</span></div>
-     <label for="e_total">総時間 <span style="color:var(--sub)">（分:秒）</span></label>
-     <input id="e_total" type="text" inputmode="numeric" placeholder="例 12:30" value="${tv(rec.totalSec)}">
+     ${ms("total","総時間",rec.totalSec)}
      <div class="row">
-       <div><label for="e_firstCrack">1ハゼ（分:秒）</label>
-         <input id="e_firstCrack" type="text" inputmode="numeric" placeholder="例 8:30" value="${tv(m.firstCrack)}"></div>
-       <div><label for="e_secondCrack">2ハゼ（分:秒）</label>
-         <input id="e_secondCrack" type="text" inputmode="numeric" placeholder="例 10:15" value="${tv(m.secondCrack)}"></div>
+       <div>${ms("firstCrack","1ハゼ",m.firstCrack)}</div>
+       <div>${ms("secondCrack","2ハゼ",m.secondCrack)}</div>
      </div>
      <div class="row">
-       <div><label for="e_fireOff">消火（分:秒）</label>
-         <input id="e_fireOff" type="text" inputmode="numeric" placeholder="例 11:00" value="${tv(m.fireOff)}"></div>
-       <div><label for="e_beansOut">ザル出し（分:秒）</label>
-         <input id="e_beansOut" type="text" inputmode="numeric" placeholder="例 11:20" value="${tv(m.beansOut)}"></div>
+       <div>${ms("fireOff","消火",m.fireOff)}</div>
+       <div>${ms("beansOut","ザル出し",m.beansOut)}</div>
      </div>
      <label for="e_memo">メモ</label>
      <textarea id="e_memo">${escapeHtml(rec.memo||"")}</textarea>`;
@@ -630,13 +638,15 @@ function openEdit(id){
 }
 function escapeAttr(s){ return escapeHtml(s).replace(/"/g,"&quot;"); }
 
-// "M:SS" or "MM:SS" -> seconds ; empty -> null ; invalid -> false
-function parseTimeInput(str){
-  const s = String(str).trim();
-  if(s==="") return null;
-  const m = s.match(/^(\d+):([0-5]?\d)$/);
-  if(m) return (+m[1])*60 + (+m[2]);
-  return false;
+// read a 分/秒 pair -> seconds ; both empty -> null ; invalid -> false
+function readTimePair(key){
+  const mS = document.getElementById("e_"+key+"_m").value.trim();
+  const sS = document.getElementById("e_"+key+"_s").value.trim();
+  if(mS==="" && sS==="") return null;
+  const mm = mS==="" ? 0 : parseInt(mS,10);
+  const ss = sS==="" ? 0 : parseInt(sS,10);
+  if(isNaN(mm) || isNaN(ss) || mm<0 || ss<0 || ss>59) return false;
+  return mm*60 + ss;
 }
 function saveEdit(){
   const logs = loadLogs();
@@ -645,8 +655,8 @@ function saveEdit(){
   // parse & validate all time fields first
   const times = {};
   for(const f of TIME_FIELDS){
-    const val = parseTimeInput(document.getElementById("e_"+f.key).value);
-    if(val===false){ toast(`${f.label}は「分:秒」で入力してください（例 8:30）`); return; }
+    const val = readTimePair(f.key);
+    if(val===false){ toast(`${f.label}の時間を正しく入力してください（秒は0〜59）`); return; }
     times[f.key] = val;
   }
   const rec = logs[idx];
