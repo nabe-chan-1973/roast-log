@@ -1,4 +1,4 @@
-const CACHE = "roast-log-v4";
+const CACHE = "roast-log-v5";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", e => {
